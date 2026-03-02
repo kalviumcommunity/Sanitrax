@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'sanitrax_live_route_map.dart';
 
 void main() => runApp(const MaterialApp(home: HomePage(), debugShowCheckedModeBanner: false));
 
@@ -35,12 +36,17 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  // Navigation Helper
+ 
   void _navigateTo(String title) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => DummyPage(title: title)),
-    );
+    Widget page;
+    if (title.toLowerCase().contains('track') ||
+        title.toLowerCase().contains('live map') ||
+        title.toLowerCase() == 'map') {
+      page = const SanitraxLiveRouteMap();
+    } else {
+      page = DummyPage(title: title);
+    }
+    Navigator.push(context, MaterialPageRoute(builder: (_) => page)); 
   }
 
   @override
@@ -223,16 +229,10 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildMapCard() {
     return _PressableScale(
-      onTap: () => _navigateTo("Live Map View"),
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SanitraxLiveRouteMap())),
       child: Container(
         height: 190,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(30),
-          image: const DecorationImage(
-            image: NetworkImage('https://api.mapbox.com/styles/v1/mapbox/light-v10/static/-74.006,40.7128,12/600x400?access_token=YOUR_TOKEN'),
-            fit: BoxFit.cover,
-          ),
-        ),
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(30), gradient: const LinearGradient(colors: [Color(0xFFE8EDE7), Color(0xFFD9E1D4)], begin: Alignment.topLeft, end: Alignment.bottomRight)),
         child: Stack(
           children: [
             Center(
@@ -280,7 +280,14 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildTrackButton() {
     return _PressableScale(
-      onTap: () => _navigateTo("Track Live Location"),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const SanitraxLiveRouteMap(),
+          ),
+        );
+      },
       child: Container(
         decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(30),
