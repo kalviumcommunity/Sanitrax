@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'schedule_page.dart';
+import 'sanitrax_live_route_map.dart';
 
 // TODO: Replace this placeholder with your actual Mapbox access token.
 const String kMapboxAccessToken = 'pk.placeholder';
@@ -272,20 +273,28 @@ class _HomePageState extends State<HomePage> {
   // track current bottom nav selection so the icon can appear active
   int _selectedIndex = 0;
 
-  // UPDATED: Navigation logic to include the Schedule Page
+  // unified navigation helper handles all tabs and actions
   void _navigateTo(String title, {int? navIndex}) {
     if (navIndex != null) {
       setState(() => _selectedIndex = navIndex);
     }
     final lower = title.toLowerCase();
     if (lower.contains('home')) {
-      // return to home route
+      // return to root and mark home active
       Navigator.popUntil(context, (route) => route.isFirst);
       setState(() => _selectedIndex = 0);
-    } else if (lower.contains("schedule")) {
+    } else if (lower.contains('schedule')) {
       Navigator.push(context, MaterialPageRoute(builder: (context) => const SchedulePage()));
+    } else if (lower.contains('track') || lower.contains('live') || lower.contains('map')) {
+      Navigator.push(context, MaterialPageRoute(builder: (context) => const SanitraxLiveRouteMap()));
+    } else {
+      // fallback generic page
+      Navigator.push(context, MaterialPageRoute(
+          builder: (_) => Scaffold(
+                appBar: AppBar(title: Text(title)),
+                body: Center(child: Text('Page: $title')),
+              )));
     }
-    // additional tabs can be handled here as needed
   }
 
   @override
@@ -402,17 +411,58 @@ class _HomePageState extends State<HomePage> {
     final bool hasToken = kMapboxAccessToken.isNotEmpty && kMapboxAccessToken != 'pk.placeholder';
 
     return _PressableScale(
-      onTap: () => _navigateTo("Map"),
+      onTap: () => _navigateTo("Map", navIndex: 2),
       child: Container(
-        height: 180,
+        height: 190,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(30),
-          color: hasToken ? null : Colors.grey[300],
-          image: hasToken
-              ? DecorationImage(
-                  image: NetworkImage('https://api.mapbox.com/styles/v1/mapbox/light-v10/static/-74.006,40.7128,12/600x400?access_token=$kMapboxAccessToken'),
-                  fit: BoxFit.cover)
-              : null,
+          gradient: const LinearGradient(
+            colors: [Color(0xFFE8EDE7), Color(0xFFD9E1D4)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Stack(
+          children: [
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                    child: const Icon(Icons.local_shipping, color: Color(0xFF4A5D4A), size: 28),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration:
+                        BoxDecoration(color: const Color(0xFF4A5D4A), borderRadius: BorderRadius.circular(6)),
+                    child: const Text('TRUCK 04',
+                        style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                  )
+                ],
+              ),
+            ),
+            Positioned(
+              bottom: 12, left: 12, right: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('CURRENT LOCATION',
+                        style: GoogleFonts.inter(
+                            fontSize: 9, color: Colors.grey, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+                    const SizedBox(height: 2),
+                    const Text('New York District 4',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF4A5D4A))),
+                  ],
+                ),
+              ),
+            )
+          ],
+
         ),
         child: Center(
             child: Container(
@@ -425,7 +475,7 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildTrackButton() {
     return _PressableScale(
-      onTap: () => _navigateTo("Live Tracking"),
+      onTap: () => _navigateTo("Live Tracking", navIndex: 2),
       child: Container(
         width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 18),
         decoration: BoxDecoration(color: const Color(0xFF4A5D4A), borderRadius: BorderRadius.circular(30)),
