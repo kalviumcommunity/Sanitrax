@@ -1,31 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'sanitrax_live_route_map.dart';
+import 'package:flutter_application_1/mainpage/schedule_page.dart';
+import 'package:flutter_application_1/mainpage/sanitrax_live_route_map.dart';
+import 'package:flutter_application_1/mainpage/report_issue_page.dart';
 
-void main() => runApp(const MaterialApp(home: HomePage(), debugShowCheckedModeBanner: false));
+// TODO: Replace this placeholder with your actual Mapbox access token.
+const String kMapboxAccessToken = 'pk.placeholder';
 
-/// --- Dummy Destination Page ---
-class DummyPage extends StatelessWidget {
-  final String title;
-  const DummyPage({super.key, required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(title, style: const TextStyle(color: Color(0xFF4A5D4A), fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Color(0xFF4A5D4A)),
-      ),
-      body: Center(
-        child: Text(
-          'Welcome to the $title Page',
-          style: const TextStyle(fontSize: 18, color: Colors.grey),
-        ),
-      ),
-    );
-  }
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const MaterialApp(
+    title: 'Sanitrax',
+    home: HomePage(),
+    debugShowCheckedModeBanner: false,
+  ));
 }
 
 class HomePage extends StatefulWidget {
@@ -36,17 +24,27 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
- 
-  void _navigateTo(String title) {
-    Widget page;
-    if (title.toLowerCase().contains('track') ||
-        title.toLowerCase().contains('live map') ||
-        title.toLowerCase() == 'map') {
-      page = const SanitraxLiveRouteMap();
-    } else {
-      page = DummyPage(title: title);
+  // track current bottom nav selection so the icon can appear active
+  int _selectedIndex = 0;
+
+  // UPDATED: Navigation logic to include the Schedule Page
+  void _navigateTo(String title, {int? navIndex}) {
+    if (navIndex != null) {
+      setState(() => _selectedIndex = navIndex);
     }
-    Navigator.push(context, MaterialPageRoute(builder: (_) => page)); 
+    final lower = title.toLowerCase();
+    if (lower.contains('home')) {
+      // return to home route
+      Navigator.popUntil(context, (route) => route.isFirst);
+      setState(() => _selectedIndex = 0);
+    } else if (lower.contains('schedule')) {
+      Navigator.push(context, MaterialPageRoute(builder: (context) => const SchedulePage()));
+    } else if (lower.contains('report') || lower.contains('issue')) {
+      Navigator.push(context, MaterialPageRoute(builder: (context) => const ReportIssuePage()));
+    } else if (lower.contains('track') || lower.contains('live') || lower.contains('map')) {
+      Navigator.push(context, MaterialPageRoute(builder: (context) => const SanitraxLiveRouteMap()));
+    }
+    // additional tabs can be handled here as needed
   }
 
   @override
@@ -74,7 +72,7 @@ class _HomePageState extends State<HomePage> {
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
-      color: const Color(0xFF4A5D4A), // Matches the dark olive in image
+      color: const Color(0xFF4A5D4A),
       padding: const EdgeInsets.fromLTRB(25, 60, 25, 40),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -82,68 +80,30 @@ class _HomePageState extends State<HomePage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'TUESDAY\n15 NOVEMBER 22',
-                style: GoogleFonts.inter(
-                    color: Colors.white70,
-                    letterSpacing: 1.5,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500),
-              ),
-              const CircleAvatar(
-                radius: 20,
-                backgroundColor: Color(0xFFE6CCB2),
-                child: Icon(Icons.person, color: Colors.brown),
-              ),
+              Text('SANITRAX\nPREMIUM SERVICE',
+                  style: GoogleFonts.inter(color: Colors.white70, letterSpacing: 1.5, fontSize: 11, fontWeight: FontWeight.w500)),
+              const CircleAvatar(radius: 20, backgroundColor: Color(0xFFE6CCB2), child: Icon(Icons.person, color: Colors.brown)),
             ],
           ),
           const SizedBox(height: 20),
-          Text(
-            'My\nCollections',
-            style: GoogleFonts.playfairDisplay( // High-contrast serif
-              fontSize: 52,
-              height: 0.85,
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-              fontStyle: FontStyle.italic,
-              letterSpacing: -1.0,
-            ),
-          ),
+          Text('Sanitrax',
+              style: GoogleFonts.playfairDisplay(fontSize: 52, height: 0.85, color: Colors.white, fontWeight: FontWeight.w800, fontStyle: FontStyle.italic, letterSpacing: -1.0)),
           const SizedBox(height: 35),
-          Row(
+          const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Household Waste',
-                    style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    'Standard Curbside Pickup',
-                    style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 14),
-                  ),
+                  Text('Household Waste', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                  Text('Standard Sanitrax Pickup', style: TextStyle(color: Colors.white70, fontSize: 14)),
                 ],
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text('ON TIME',
-                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    '10:15 AM',
-                    style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900),
-                  ),
+                  Text('10:15 AM', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900)),
                 ],
               )
             ],
@@ -157,16 +117,13 @@ class _HomePageState extends State<HomePage> {
     return Transform.translate(
       offset: const Offset(0, -30),
       child: Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFFFBFBFB),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(40)),
-        ),
+        decoration: const BoxDecoration(color: Color(0xFFFBFBFB), borderRadius: BorderRadius.vertical(top: Radius.circular(40))),
         padding: const EdgeInsets.symmetric(horizontal: 25),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 30),
-            _buildSectionHeader('Quick Actions'),
+            _buildSectionHeader('Sanitrax Actions'),
             const SizedBox(height: 15),
             _buildMapCard(),
             const SizedBox(height: 20),
@@ -174,29 +131,13 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 20),
             Row(
               children: [
-                Expanded(
-                  child: FeatureButton(
-                    icon: Icons.report_gmailerrorred_rounded,
-                    title: 'Report\nMissed Pickup',
-                    bgColor: const Color(0xFFFFEBEB), // Pale red background
-                    iconColor: Colors.red,
-                    onTap: () => _navigateTo("Report Missed Pickup"),
-                  ),
-                ),
+                Expanded(child: FeatureButton(icon: Icons.report_gmailerrorred_rounded, title: 'Report\nIssue', bgColor: const Color(0xFFFFEBEB), iconColor: Colors.red, onTap: () => _navigateTo("Report Issue"))),
                 const SizedBox(width: 15),
-                Expanded(
-                  child: FeatureButton(
-                    icon: Icons.calendar_today_outlined,
-                    title: 'Full\nSchedule',
-                    bgColor: Colors.white,
-                    iconColor: const Color(0xFF4A5D4A),
-                    onTap: () => _navigateTo("Full Schedule"),
-                  ),
-                ),
+                Expanded(child: FeatureButton(icon: Icons.calendar_today_outlined, title: 'Pickup\nSchedule', bgColor: Colors.white, iconColor: const Color(0xFF4A5D4A), onTap: () => _navigateTo("Schedule"))),
               ],
             ),
             const SizedBox(height: 35),
-            _buildSectionHeader('Upcoming'),
+            _buildSectionHeader('Upcoming Bins'),
             const SizedBox(height: 15),
             _buildUpcomingCard(),
             const SizedBox(height: 40),
@@ -211,281 +152,135 @@ class _HomePageState extends State<HomePage> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF4A5D4A))),
-        SizedBox(
-          height: 30,
-          child: TextButton(
-            onPressed: () => _navigateTo("All $title"),
-            style: TextButton.styleFrom(
-                backgroundColor: const Color(0xFFEFEFEF),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                padding: const EdgeInsets.symmetric(horizontal: 12)),
-            child: const Text('See All',
-                style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold)),
-          ),
-        )
+        TextButton(onPressed: () => _navigateTo(title), child: const Text('See All', style: TextStyle(color: Colors.grey, fontSize: 12)))
       ],
     );
   }
 
   Widget _buildMapCard() {
+    final bool hasToken = kMapboxAccessToken.isNotEmpty && kMapboxAccessToken != 'pk.placeholder';
+
     return _PressableScale(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SanitraxLiveRouteMap())),
+      onTap: () => _navigateTo("Map"),
       child: Container(
-        height: 190,
-        decoration: BoxDecoration(borderRadius: BorderRadius.circular(30), gradient: const LinearGradient(colors: [Color(0xFFE8EDE7), Color(0xFFD9E1D4)], begin: Alignment.topLeft, end: Alignment.bottomRight)),
-        child: Stack(
-          children: [
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                    child: const Icon(Icons.local_shipping, color: Color(0xFF4A5D4A), size: 28),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration:
-                        BoxDecoration(color: const Color(0xFF4A5D4A), borderRadius: BorderRadius.circular(6)),
-                    child: const Text('TRUCK 04',
-                        style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
-                  )
-                ],
-              ),
-            ),
-            Positioned(
-              bottom: 12, left: 12, right: 12,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('CURRENT LOCATION',
-                        style: GoogleFonts.inter(
-                            fontSize: 9, color: Colors.grey, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
-                    const SizedBox(height: 2),
-                    const Text('New York District 4',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF4A5D4A))),
-                  ],
-                ),
-              ),
-            )
-          ],
+        height: 180,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(30),
+          color: hasToken ? null : Colors.grey[300],
+          image: hasToken
+              ? DecorationImage(
+                  image: NetworkImage('https://api.mapbox.com/styles/v1/mapbox/light-v10/static/-74.006,40.7128,12/600x400?access_token=$kMapboxAccessToken'),
+                  fit: BoxFit.cover)
+              : null,
         ),
+        child: Center(
+            child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                child: const Icon(Icons.local_shipping, color: Color(0xFF4A5D4A), size: 30)))
       ),
     );
   }
 
   Widget _buildTrackButton() {
     return _PressableScale(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const SanitraxLiveRouteMap(),
-          ),
-        );
-      },
+      onTap: () => _navigateTo("Live Tracking"),
       child: Container(
-        decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(30),
-            boxShadow: [
-              BoxShadow(color: const Color(0xFF4A5D4A).withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 8))
-            ]),
-        child: ElevatedButton.icon(
-          onPressed: null, // Tap handled by _PressableScale
-          icon: const Icon(Icons.explore_outlined, size: 22, color: Colors.white),
-          label: const Text('Track Live Location',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF4A5D4A),
-            disabledBackgroundColor: const Color(0xFF4A5D4A),
-            minimumSize: const Size(double.infinity, 60),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-            elevation: 0,
-          ),
-        ),
+        width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 18),
+        decoration: BoxDecoration(color: const Color(0xFF4A5D4A), borderRadius: BorderRadius.circular(30)),
+        alignment: Alignment.center,
+        child: const Text('Track Sanitrax Truck', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
       ),
     );
   }
 
   Widget _buildUpcomingCard() {
-    return _PressableScale(
-      onTap: () => _navigateTo("Upcoming Details"),
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(30),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 20, offset: const Offset(0, 10))
-          ],
-        ),
-        child: Row(
-          children: [
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(25), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10)]),
+      child: Row(
+        children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(color: const Color(0xFFF5F5F5), borderRadius: BorderRadius.circular(20)),
-              child: Column(
-                children: [
-                  Text('WED', style: GoogleFonts.inter(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.w800)),
-                  const Text('24',
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF4A5D4A))),
-                ],
-              ),
-            ),
-            const SizedBox(width: 20),
-            const Expanded(
-              child: Column(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: const Color(0xFFF5F5F5), borderRadius: BorderRadius.circular(15)),
+              child: const Text('24\nWED', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+          const SizedBox(width: 15),
+          const Expanded(
+            child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Paper & Cardboard',
-                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Color(0xFF4A5D4A))),
-                  Text('Standard Curbside',
-                      style: TextStyle(color: Colors.grey, fontSize: 14, fontWeight: FontWeight.w500)),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right, color: Color(0xFFE0E0E0), size: 30),
-          ],
-        ),
+                  Text('Paper & Cardboard', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text('Sanitrax Recycling', style: TextStyle(color: Colors.grey, fontSize: 12))
+                ]),
+          )
+        ],
       ),
     );
   }
 
   Widget _buildBottomNav() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 10, 10, 30),
-      decoration: const BoxDecoration(
-          color: Colors.white, border: Border(top: BorderSide(color: Color(0xFFEEEEEE), width: 1))),
+      padding: const EdgeInsets.only(bottom: 30, top: 10), color: Colors.white,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _navItem(Icons.home_filled, 'HOME', true),
-          _navItem(Icons.calendar_month, 'SCHEDULE', false),
-          _navItem(Icons.map_outlined, 'MAP', false),
-          _navItem(Icons.settings_outlined, 'SETTINGS', false),
+          _navItem(Icons.home_filled, 'HOME', _selectedIndex == 0, 0),
+          _navItem(Icons.calendar_month, 'Schedule', _selectedIndex == 1, 1),
+          _navItem(Icons.map, 'MAP', _selectedIndex == 2, 2),
+          _navItem(Icons.settings, 'SETTINGS', _selectedIndex == 3, 3),
         ],
       ),
     );
   }
 
-  Widget _navItem(IconData icon, String label, bool isActive) {
-    Color color = isActive ? const Color(0xFF4A5D4A) : const Color(0xFFB0BEC5);
-    return _PressableScale(
-      onTap: () => _navigateTo(label),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: 26),
-          const SizedBox(height: 4),
-          Text(label,
-              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: color, letterSpacing: 0.5)),
-        ],
-      ),
+  Widget _navItem(IconData icon, String label, bool isActive, int index) {
+    return GestureDetector(
+      onTap: () => _navigateTo(label, navIndex: index),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, color: isActive ? const Color(0xFF4A5D4A) : Colors.grey),
+        Text(label,
+            style: TextStyle(
+                fontSize: 10,
+                color: isActive ? const Color(0xFF4A5D4A) : Colors.grey))
+      ]),
     );
   }
 }
 
-/// --- Custom Feature Button with Scale Animation ---
 class FeatureButton extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final Color bgColor;
-  final Color iconColor;
-  final VoidCallback onTap;
-
-  const FeatureButton({
-    super.key,
-    required this.icon,
-    required this.title,
-    required this.bgColor,
-    required this.iconColor,
-    required this.onTap,
-  });
-
+  final IconData icon; final String title; final Color bgColor; final Color iconColor; final VoidCallback onTap;
+  const FeatureButton({super.key, required this.icon, required this.title, required this.bgColor, required this.iconColor, required this.onTap});
   @override
   Widget build(BuildContext context) {
-    return _PressableScale(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(22),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(30),
-          boxShadow: bgColor == Colors.white
-              ? [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 20, offset: const Offset(0, 10))]
-              : [],
-        ),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: iconColor.withOpacity(0.1), shape: BoxShape.circle),
-              child: Icon(icon, size: 28, color: iconColor),
-            ),
-            const SizedBox(height: 12),
-            Text(title,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF4A5D4A))),
-          ],
-        ),
-      ),
-    );
+    return _PressableScale(onTap: onTap, child: Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(30), boxShadow: bgColor == Colors.white ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)] : []), child: Column(children: [Icon(icon, color: iconColor, size: 30), const SizedBox(height: 10), Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4A5D4A)))])));
   }
 }
 
-/// --- Pressable Scale Widget with Animation ---
 class _PressableScale extends StatefulWidget {
-  final Widget child;
-  final VoidCallback onTap;
-
-  const _PressableScale({
-    required this.child,
-    required this.onTap,
-  });
-
+  final Widget child; final VoidCallback onTap;
+  const _PressableScale({required this.child, required this.onTap});
   @override
   State<_PressableScale> createState() => _PressableScaleState();
 }
 
 class _PressableScaleState extends State<_PressableScale> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
-
+  late AnimationController _controller; late Animation<double> _scaleAnimation;
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 150),
-      vsync: this,
-    );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _controller = AnimationController(duration: const Duration(milliseconds: 100), vsync: this);
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.96).animate(_controller);
   }
-
   @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
+  void dispose() { _controller.dispose(); super.dispose(); }
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTapDown: (_) => _controller.forward(),
-      onTapUp: (_) {
-        _controller.reverse();
-        widget.onTap();
-      },
+      onTapUp: (_) { _controller.reverse(); widget.onTap(); },
       onTapCancel: () => _controller.reverse(),
-      child: ScaleTransition(
-        scale: _scaleAnimation,
-        child: widget.child,
-      ),
+      child: ScaleTransition(scale: _scaleAnimation, child: widget.child),
     );
   }
 }
+
