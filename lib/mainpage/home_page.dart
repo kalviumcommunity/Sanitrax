@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_application_1/mainpage/schedule_page.dart';
 import 'package:flutter_application_1/mainpage/sanitrax_live_route_map.dart';
 import 'package:flutter_application_1/mainpage/report_issue_page.dart';
+import 'package:flutter_application_1/mainpage/profile_page.dart';  
 
 // TODO: Replace this placeholder with your actual Mapbox access token.
 const String kMapboxAccessToken = 'pk.placeholder';
@@ -43,6 +44,8 @@ class _HomePageState extends State<HomePage> {
       Navigator.push(context, MaterialPageRoute(builder: (context) => const ReportIssuePage()));
     } else if (lower.contains('track') || lower.contains('live') || lower.contains('map')) {
       Navigator.push(context, MaterialPageRoute(builder: (context) => const SanitraxLiveRouteMap()));
+    } else if (lower.contains('profile')) {
+      Navigator.push(context, MaterialPageRoute(builder: (context) => const ProfilePage()));
     }
     // additional tabs can be handled here as needed
   }
@@ -82,7 +85,14 @@ class _HomePageState extends State<HomePage> {
             children: [
               Text('SANITRAX\nPREMIUM SERVICE',
                   style: GoogleFonts.inter(color: Colors.white70, letterSpacing: 1.5, fontSize: 11, fontWeight: FontWeight.w500)),
-              const CircleAvatar(radius: 20, backgroundColor: Color(0xFFE6CCB2), child: Icon(Icons.person, color: Colors.brown)),
+              GestureDetector(
+                onTap: () => _navigateTo('Profile'),
+                child: const CircleAvatar(
+                  radius: 20,
+                  backgroundColor: Color(0xFFE6CCB2),
+                  child: Icon(Icons.person, color: Colors.brown),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 20),
@@ -283,4 +293,3 @@ class _PressableScaleState extends State<_PressableScale> with SingleTickerProvi
     );
   }
 }
-
