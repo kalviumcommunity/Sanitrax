@@ -13,7 +13,8 @@ class SanitraxLiveRouteMap extends StatefulWidget {
   State<SanitraxLiveRouteMap> createState() => _SanitraxLiveRouteMapState();
 }
 
-class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap> with SingleTickerProviderStateMixin {
+class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap>
+    with SingleTickerProviderStateMixin {
   final MapController _mapController = MapController();
   final List<ll.LatLng> _defaultStops = const [
     ll.LatLng(11.1271, 78.6569),
@@ -52,10 +53,17 @@ class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap> with Single
     _pathPoints = _resamplePath(_routePoints, 10.0);
     _truck = _pathPoints.first;
     _computeSegmentMetrics();
-    _controller = AnimationController(vsync: this, duration: _segmentDuration(0));
-    _t = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(parent: _controller, curve: Curves.linear))
-      ..addListener(_onTick)
-      ..addStatusListener(_onStatus);
+    _controller = AnimationController(
+      vsync: this,
+      duration: _segmentDuration(0),
+    );
+    _t =
+        Tween<double>(
+            begin: 0,
+            end: 1,
+          ).animate(CurvedAnimation(parent: _controller, curve: Curves.linear))
+          ..addListener(_onTick)
+          ..addStatusListener(_onStatus);
     setState(() {
       _ready = true;
     });
@@ -64,7 +72,9 @@ class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap> with Single
 
   Future<List<ll.LatLng>> fetchOsrmRoute(List<ll.LatLng> stops) async {
     final coords = stops.map((p) => '${p.longitude},${p.latitude}').join(';');
-    final uri = Uri.parse('https://router.project-osrm.org/route/v1/driving/$coords?overview=full&geometries=geojson');
+    final uri = Uri.parse(
+      'https://router.project-osrm.org/route/v1/driving/$coords?overview=full&geometries=geojson',
+    );
     final resp = await http.get(uri);
     if (resp.statusCode != 200) {
       throw Exception('OSRM HTTP ${resp.statusCode}');
@@ -125,12 +135,18 @@ class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap> with Single
 
   Duration _segmentDuration(int idx) {
     final frac = _segmentLengths[idx] / _totalLength;
-    final ms = (_baseLoop.inMilliseconds * frac).clamp(200.0, _baseLoop.inMilliseconds.toDouble());
+    final ms = (_baseLoop.inMilliseconds * frac).clamp(
+      200.0,
+      _baseLoop.inMilliseconds.toDouble(),
+    );
     return Duration(milliseconds: ms.round());
   }
 
   ll.LatLng _interpolate(ll.LatLng a, ll.LatLng b, double t) {
-    return ll.LatLng(a.latitude + (b.latitude - a.latitude) * t, a.longitude + (b.longitude - a.longitude) * t);
+    return ll.LatLng(
+      a.latitude + (b.latitude - a.latitude) * t,
+      a.longitude + (b.longitude - a.longitude) * t,
+    );
   }
 
   List<ll.LatLng> _resamplePath(List<ll.LatLng> pts, double stepMeters) {
@@ -157,7 +173,9 @@ class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap> with Single
     final lat2 = _toRad(b.latitude);
     final dLon = _toRad(b.longitude - a.longitude);
     final y = math.sin(dLon) * math.cos(lat2);
-    final x = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(dLon);
+    final x =
+        math.cos(lat1) * math.sin(lat2) -
+        math.sin(lat1) * math.cos(lat2) * math.cos(dLon);
     var brng = math.atan2(y, x);
     if (brng < 0) brng += 2 * math.pi;
     return brng;
@@ -177,25 +195,34 @@ class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap> with Single
           options: MapOptions(
             initialCenter: _pathPoints.first,
             initialZoom: _zoom,
-            interactionOptions: const InteractionOptions(flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag),
+            interactionOptions: const InteractionOptions(
+              flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
+            ),
           ),
           children: [
-            TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'com.example.sanitrax'),
-            PolylineLayer(polylines: [
-              Polyline(points: _pathPoints, color: const Color(0xFFFFFFFF), strokeWidth: 5, borderStrokeWidth: 0),
-            ]),
-            MarkerLayer(markers: [
-              for (int i = 0; i < _stops.length; i++) _stopMarker(i),
-              _truckMarker(),
-            ]),
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.example.sanitrax',
+            ),
+            PolylineLayer(
+              polylines: [
+                Polyline(
+                  points: _pathPoints,
+                  color: const Color(0xFFFFFFFF),
+                  strokeWidth: 5,
+                  borderStrokeWidth: 0,
+                ),
+              ],
+            ),
+            MarkerLayer(
+              markers: [
+                for (int i = 0; i < _stops.length; i++) _stopMarker(i),
+                _truckMarker(),
+              ],
+            ),
           ],
         ),
-        Positioned(
-          bottom: 20,
-          left: 20,
-          right: 20,
-          child: _etaCard(),
-        )
+        Positioned(bottom: 20, left: 20, right: 20, child: _etaCard()),
       ],
     );
   }
@@ -208,11 +235,21 @@ class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap> with Single
       child: Transform.rotate(
         angle: _bearingRad,
         child: Container(
-          decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white,
+          ),
           padding: const EdgeInsets.all(8),
           child: Container(
-            decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF5E6F52)),
-            child: const Icon(Icons.local_shipping, size: 20, color: Colors.white),
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Color(0xFF5E6F52),
+            ),
+            child: const Icon(
+              Icons.local_shipping,
+              size: 20,
+              color: Colors.white,
+            ),
           ),
         ),
       ),
@@ -222,9 +259,15 @@ class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap> with Single
   Marker _stopMarker(int i) {
     final isCurrent = i == _segment + 1;
     final isCompleted = i <= _segment;
-    final scale = isCurrent ? 1.0 + 0.08 * math.sin(DateTime.now().millisecondsSinceEpoch / 120.0) : 1.0;
-    final Color fill = isCompleted ? const Color(0xFF2F4F2E) : const Color(0xFF5E6F52);
-    final Color border = isCompleted ? const Color(0xFF2F4F2E) : const Color(0xFFE0E8DA);
+    final scale = isCurrent
+        ? 1.0 + 0.08 * math.sin(DateTime.now().millisecondsSinceEpoch / 120.0)
+        : 1.0;
+    final Color fill = isCompleted
+        ? const Color(0xFF2F4F2E)
+        : const Color(0xFF5E6F52);
+    final Color border = isCompleted
+        ? const Color(0xFF2F4F2E)
+        : const Color(0xFFE0E8DA);
     return Marker(
       point: _stops[i],
       width: 22,
@@ -232,7 +275,11 @@ class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap> with Single
       child: Transform.scale(
         scale: scale,
         child: Container(
-          decoration: BoxDecoration(shape: BoxShape.circle, color: fill, border: Border.all(color: border, width: 2)),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: fill,
+            border: Border.all(color: border, width: 2),
+          ),
         ),
       ),
     );
@@ -242,7 +289,17 @@ class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap> with Single
     final progress = (_segment + _t.value) / (_pathPoints.length - 1);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      decoration: BoxDecoration(color: const Color(0xFF5E6F52), borderRadius: BorderRadius.circular(30), boxShadow: [BoxShadow(color: const Color(0xFF5E6F52).withOpacity(0.35), blurRadius: 16, offset: const Offset(0, 10))]),
+      decoration: BoxDecoration(
+        color: const Color(0xFF5E6F52),
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF5E6F52).withOpacity(0.35),
+            blurRadius: 16,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -253,18 +310,48 @@ class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap> with Single
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: const [
-                  Text('ESTIMATED ARRIVAL', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+                  Text(
+                    'ESTIMATED ARRIVAL',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
                   SizedBox(height: 6),
-                  Text('12 min', style: TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.w900)),
+                  Text(
+                    '12 min',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 42,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                   SizedBox(height: 2),
-                  Text('On Time', style: TextStyle(color: Colors.white70, fontSize: 16)),
+                  Text(
+                    'On Time',
+                    style: TextStyle(color: Colors.white70, fontSize: 16),
+                  ),
                 ],
               ),
               Container(
                 height: 76,
                 width: 76,
-                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                child: const Center(child: Text('TRACK', style: TextStyle(color: Color(0xFF5E6F52), fontWeight: FontWeight.w900, letterSpacing: 1))),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: const Center(
+                  child: Text(
+                    'TRACK',
+                    style: TextStyle(
+                      color: Color(0xFF5E6F52),
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
@@ -279,10 +366,16 @@ class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap> with Single
             ),
           ),
           const SizedBox(height: 10),
-          const Text('Route A • Stop 8 of 12', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
+          const Text(
+            'Route A • Stop 8 of 12',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
   }
 }
-
