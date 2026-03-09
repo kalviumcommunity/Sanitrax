@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart' as ll;
+import 'package:flutter_application_1/services/firestore_service.dart';
 
 class SanitraxLiveRouteMap extends StatefulWidget {
   final List<ll.LatLng>? routePoints;
@@ -16,6 +17,7 @@ class SanitraxLiveRouteMap extends StatefulWidget {
 class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap>
     with SingleTickerProviderStateMixin {
   final MapController _mapController = MapController();
+  final FirestoreService _firestoreService = FirestoreService();
   final List<ll.LatLng> _defaultStops = const [
     ll.LatLng(11.1271, 78.6569),
     ll.LatLng(11.1285, 78.6590),
@@ -51,6 +53,7 @@ class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap>
     final decoded = await fetchOsrmRoute(stops);
     _routePoints = decoded;
     _pathPoints = _resamplePath(_routePoints, 10.0);
+    await _saveRouteToFirestore();
     _truck = _pathPoints.first;
     _computeSegmentMetrics();
     _controller = AnimationController(
@@ -68,6 +71,25 @@ class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap>
       _ready = true;
     });
     _controller.forward();
+  }
+
+  Future<void> _saveRouteToFirestore() async {
+    try {
+      final stops = _stops
+          .map((p) => <String, double>{'lat': p.latitude, 'lng': p.longitude})
+          .toList();
+      final path = _pathPoints
+          .map((p) => <String, double>{'lat': p.latitude, 'lng': p.longitude})
+          .toList();
+
+      await _firestoreService.saveLiveRoute(stops: stops, path: path);
+    } catch (e) {
+      debugPrint('Map route save failed: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not save map route to Firestore.')),
+      );
+    }
   }
 
   Future<List<ll.LatLng>> fetchOsrmRoute(List<ll.LatLng> stops) async {

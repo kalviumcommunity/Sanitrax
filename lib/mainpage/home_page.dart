@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_application_1/mainpage/schedule_page.dart';
 import 'package:flutter_application_1/mainpage/sanitrax_live_route_map.dart';
 import 'package:flutter_application_1/mainpage/report_issue_page.dart';
+import 'package:flutter_application_1/mainpage/profile_page.dart';
 
 // TODO: Replace this placeholder with your actual Mapbox access token.
 const String kMapboxAccessToken = 'pk.placeholder';
@@ -82,7 +83,12 @@ class _HomePageState extends State<HomePage> {
             children: [
               Text('SANITRAX\nPREMIUM SERVICE',
                   style: GoogleFonts.inter(color: Colors.white70, letterSpacing: 1.5, fontSize: 11, fontWeight: FontWeight.w500)),
-              const CircleAvatar(radius: 20, backgroundColor: Color(0xFFE6CCB2), child: Icon(Icons.person, color: Colors.brown)),
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const ProfilePage()));
+                },
+                child: const CircleAvatar(radius: 20, backgroundColor: Color(0xFFE6CCB2), child: Icon(Icons.person, color: Colors.brown)),
+              ),
             ],
           ),
           const SizedBox(height: 20),
