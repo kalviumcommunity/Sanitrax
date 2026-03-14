@@ -4,6 +4,7 @@ import 'package:flutter_application_1/mainpage/schedule_page.dart';
 import 'package:flutter_application_1/mainpage/sanitrax_live_route_map.dart';
 import 'package:flutter_application_1/mainpage/report_issue_page.dart';
 import 'package:flutter_application_1/mainpage/profile_page.dart';
+import 'package:flutter_application_1/pages/alerts_page.dart';
 
 // TODO: Replace this placeholder with your actual Mapbox access token.
 const String kMapboxAccessToken = 'pk.placeholder';
@@ -99,13 +100,29 @@ class _HomePageState extends State<HomePage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('SANITRAX\nPREMIUM SERVICE',
-                  style: GoogleFonts.inter(color: Colors.white70, letterSpacing: 1.5, fontSize: 11, fontWeight: FontWeight.w500)),
+              Text(
+                'SANITRAX\nPREMIUM SERVICE',
+                style: GoogleFonts.inter(
+                  color: Colors.white70,
+                  letterSpacing: 1.5,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
               GestureDetector(
                 onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const ProfilePage()));
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ProfilePage(),
+                    ),
+                  );
                 },
-                child: const CircleAvatar(radius: 20, backgroundColor: Color(0xFFE6CCB2), child: Icon(Icons.person, color: Colors.brown)),
+                child: const CircleAvatar(
+                  radius: 20,
+                  backgroundColor: Color(0xFFE6CCB2),
+                  child: Icon(Icons.person, color: Colors.brown),
+                ),
               ),
             ],
           ),
