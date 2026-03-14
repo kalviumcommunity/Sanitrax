@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 import '../mainpage/home_page.dart';
+import '../mainpage/admin_dashboard_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -13,8 +15,23 @@ class _LoginPageState extends State<LoginPage> {
   final AuthService _auth = AuthService();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
-  bool isResident = true;
   bool hidePassword = true;
+
+  Future<void> _routeByRole(User user) async {
+    // Role is always derived from email/domain rules in AuthService.
+    await _auth.ensureUserProfile(user, defaultRole: 'Resident');
+    final role = await _auth.getUserRole(user.uid);
+
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => role.toLowerCase() == 'admin'
+            ? const AdminDashboardPage()
+            : const HomePage(),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -62,72 +79,26 @@ class _LoginPageState extends State<LoginPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Resident / Admin Toggle
                     Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF0F0F0),
-                        borderRadius: BorderRadius.circular(25),
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
                       ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () => setState(() => isResident = true),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isResident
-                                      ? const Color(0xFF4A7C59)
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(25),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    'Resident',
-                                    style: TextStyle(
-                                      color: isResident
-                                          ? Colors.white
-                                          : const Color(0xFF999999),
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () => setState(() => isResident = false),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: !isResident
-                                      ? const Color(0xFF4A7C59)
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(25),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    'Admin',
-                                    style: TextStyle(
-                                      color: !isResident
-                                          ? Colors.white
-                                          : const Color(0xFF999999),
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0F7F2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'Role is assigned automatically from your email domain.',
+                        style: TextStyle(
+                          color: Color(0xFF4A7C59),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 20),
                     // Email Field
                     const Text(
                       'Email Address',
@@ -254,13 +225,8 @@ class _LoginPageState extends State<LoginPage> {
                               emailController.text,
                               passwordController.text,
                             );
-                            if (user != null && context.mounted) {
-                              Navigator.pushReplacement(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const HomePage(),
-                                ),
-                              );
+                            if (user != null) {
+                              await _routeByRole(user);
                             }
                           } catch (e) {
                             if (context.mounted) {
@@ -355,11 +321,8 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> googleSignIn() async {
     try {
       final user = await _auth.signInWithGoogle();
-      if (user != null && mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomePage()),
-        );
+      if (user != null) {
+        await _routeByRole(user);
       }
     } catch (e) {
       if (mounted) {
@@ -371,6 +334,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void showSignUpDialog(BuildContext context) {
+    final nameCtrl = TextEditingController();
     final emailCtrl = TextEditingController();
     final passCtrl = TextEditingController();
     bool hidePass = true;
@@ -403,6 +367,23 @@ class _LoginPageState extends State<LoginPage> {
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF4A7C59),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Full Name',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: InputDecoration(
+                      hintText: 'Enter your name',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      filled: true,
+                      fillColor: const Color(0xFFFAFAFA),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -456,20 +437,28 @@ class _LoginPageState extends State<LoginPage> {
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
                       onPressed: () async {
-                        if (emailCtrl.text.isEmpty || passCtrl.text.isEmpty)
+                        if (nameCtrl.text.isEmpty ||
+                            emailCtrl.text.isEmpty ||
+                            passCtrl.text.isEmpty) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Please fill all fields'),
+                              ),
+                            );
+                          }
                           return;
+                        }
                         try {
                           final user = await _auth.signUp(
                             emailCtrl.text,
                             passCtrl.text,
+                            name: nameCtrl.text.trim(),
+                            role: 'Resident',
                           );
                           if (user != null && mounted) {
                             Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Account created! Please login.'),
-                              ),
-                            );
+                            await _routeByRole(user);
                           }
                         } catch (e) {
                           if (mounted) {
@@ -494,12 +483,7 @@ class _LoginPageState extends State<LoginPage> {
                           final user = await _auth.signInWithGoogle();
                           if (user != null && mounted) {
                             Navigator.pop(context);
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const HomePage(),
-                              ),
-                            );
+                            await _routeByRole(user);
                           }
                         } catch (e) {
                           if (mounted) {
