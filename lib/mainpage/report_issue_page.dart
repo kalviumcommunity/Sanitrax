@@ -2,6 +2,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_application_1/models/issue_model.dart';
+import 'package:flutter_application_1/services/cloudinary_service.dart'
+    as cloudinary_service;
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_application_1/services/firestore_service.dart';
 
 /// Screen where users can file a missed‑pickup report.
 class ReportIssuePage extends StatefulWidget {
@@ -13,8 +19,11 @@ class ReportIssuePage extends StatefulWidget {
 
 class _ReportIssuePageState extends State<ReportIssuePage> {
   final TextEditingController _notesController = TextEditingController();
+  String? _selectedIssueType;
   File? _capturedImage;
   final ImagePicker _picker = ImagePicker();
+  final FirestoreService _firestoreService = FirestoreService();
+  bool _isSubmitting = false;
 
   Future<void> _openCamera() async {
     try {
@@ -48,11 +57,14 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
           icon: const Icon(Icons.chevron_left, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Sanitrax Support',
-            style: TextStyle(
-                color: Colors.black,
-                fontSize: 16,
-                fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Sanitrax Support',
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
@@ -62,13 +74,15 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 10),
-            Text('Report a Pickup Issue',
-                style: GoogleFonts.playfairDisplay(
-                  fontSize: 34,
-                  fontWeight: FontWeight.w900,
-                  fontStyle: FontStyle.italic,
-                  color: const Color(0xFF4A5D4A),
-                )),
+            Text(
+              'Report a Pickup Issue',
+              style: GoogleFonts.playfairDisplay(
+                fontSize: 34,
+                fontWeight: FontWeight.w900,
+                fontStyle: FontStyle.italic,
+                color: const Color(0xFF4A5D4A),
+              ),
+            ),
             const SizedBox(height: 10),
             const Text(
               'Provide details about the missed pickup to help the Sanitrax team resolve it quickly.',
@@ -84,7 +98,9 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
                 borderRadius: BorderRadius.circular(40),
                 image: _capturedImage != null
                     ? DecorationImage(
-                        image: FileImage(_capturedImage!), fit: BoxFit.cover)
+                        image: FileImage(_capturedImage!),
+                        fit: BoxFit.cover,
+                      )
                     : null,
               ),
               child: Column(
@@ -96,20 +112,27 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
                         color: Colors.white.withOpacity(0.2),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.camera_alt,
-                          color: Colors.white, size: 30),
+                      child: const Icon(
+                        Icons.camera_alt,
+                        color: Colors.white,
+                        size: 30,
+                      ),
                     ),
                     const SizedBox(height: 20),
-                    const Text('Upload Photo',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Upload Photo',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 8),
-                    const Text('Take a clear photo of the\nuncollected bins',
-                        textAlign: TextAlign.center,
-                        style:
-                            TextStyle(color: Colors.white70, fontSize: 13)),
+                    const Text(
+                      'Take a clear photo of the\nuncollected bins',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white70, fontSize: 13),
+                    ),
                   ] else ...[
                     const SizedBox(height: 80),
                   ],
@@ -121,31 +144,40 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
                       foregroundColor: Colors.black,
                       shape: const StadiumBorder(),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 35, vertical: 15),
+                        horizontal: 35,
+                        vertical: 15,
+                      ),
                       elevation: 0,
                     ),
-                    child: Text(_capturedImage == null
-                        ? 'Open Camera'
-                        : 'Retake Photo',
-                        style: const TextStyle(fontWeight: FontWeight.bold)),
-                  )
+                    child: Text(
+                      _capturedImage == null ? 'Open Camera' : 'Retake Photo',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
                 ],
               ),
             ),
 
             const SizedBox(height: 30),
-            _buildReadOnlyField(
-                'CURRENT LOCATION',
-                '842 Urban Heights, Sector 4, NY',
-                Icons.location_on),
+            _buildIssueTypeDropdown(),
             const SizedBox(height: 20),
 
-            const Text('ADDITIONAL NOTES',
-                style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.grey,
-                    letterSpacing: 0.5)),
+            _buildReadOnlyField(
+              'CURRENT LOCATION',
+              '842 Urban Heights, Sector 4, NY',
+              Icons.location_on,
+            ),
+            const SizedBox(height: 20),
+
+            const Text(
+              'ADDITIONAL NOTES',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                color: Colors.grey,
+                letterSpacing: 0.5,
+              ),
+            ),
             const SizedBox(height: 10),
             Container(
               decoration: BoxDecoration(
@@ -155,13 +187,14 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
               child: TextField(
                 controller: _notesController,
                 maxLines: 4,
-                style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF4A5D4A)),
+                style: const TextStyle(fontSize: 13, color: Color(0xFF4A5D4A)),
                 decoration: InputDecoration(
                   hintText:
                       'e.g. Bins were placed out by 6 AM, but were skipped...',
-                  hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+                  hintStyle: TextStyle(
+                    color: Colors.grey.shade400,
+                    fontSize: 13,
+                  ),
                   contentPadding: const EdgeInsets.all(15),
                   border: InputBorder.none,
                 ),
@@ -177,9 +210,10 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
                 borderRadius: BorderRadius.circular(25),
                 boxShadow: [
                   BoxShadow(
-                      color: Colors.black.withOpacity(0.03),
-                      blurRadius: 10,
-                      offset: const Offset(0, 5))
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
                 ],
               ),
               child: const Column(
@@ -188,24 +222,32 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
                     children: [
                       CircleAvatar(
                         backgroundColor: Color(0xFFF0F4F0),
-                        child: Icon(Icons.check_circle,
-                            color: Color(0xFF4A5D4A)),
+                        child: Icon(
+                          Icons.check_circle,
+                          color: Color(0xFF4A5D4A),
+                        ),
                       ),
                       SizedBox(width: 15),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Sanitrax Ticket',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xFF4A5D4A))),
-                          Text('STATUS: READY TO SUBMIT',
-                              style: TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold)),
+                          Text(
+                            'Sanitrax Ticket',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF4A5D4A),
+                            ),
+                          ),
+                          Text(
+                            'STATUS: READY TO SUBMIT',
+                            style: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ],
-                      )
+                      ),
                     ],
                   ),
                   Padding(
@@ -213,9 +255,12 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
                     child: Text(
                       'Once submitted, a Sanitrax agent will review your report within 24 hours.',
                       style: TextStyle(
-                          color: Colors.grey, fontSize: 11, height: 1.5),
+                        color: Colors.grey,
+                        fontSize: 11,
+                        height: 1.5,
+                      ),
                     ),
-                  )
+                  ),
                 ],
               ),
             ),
@@ -229,17 +274,120 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
     );
   }
 
+  Widget _buildIssueTypeDropdown() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'ISSUE TYPE',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w900,
+            color: Colors.grey,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 15),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: DropdownButtonFormField<String>(
+            value: _selectedIssueType,
+            hint: const Text(
+              'Select Issue Type',
+              style: TextStyle(fontSize: 13, color: Color(0xFF4A5D4A)),
+            ),
+            onChanged: (String? newValue) {
+              setState(() {
+                _selectedIssueType = newValue;
+              });
+            },
+            items: <String>['Missed Pickup', 'Damaged Bin', 'Spillage', 'Other']
+                .map<DropdownMenuItem<String>>((String value) {
+                  return DropdownMenuItem<String>(
+                    value: value,
+                    child: Text(
+                      value,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF4A5D4A),
+                      ),
+                    ),
+                  );
+                })
+                .toList(),
+            decoration: const InputDecoration(border: InputBorder.none),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildSubmitButton(BuildContext context) {
     return _PressableScale(
-      onTap: () {
+      onTap: () async {
         if (_capturedImage == null) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(const SnackBar(content: Text('Please take a photo first!')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please take a photo first!')),
+          );
           return;
         }
-        ScaffoldMessenger.of(context).
-            showSnackBar(const SnackBar(content: Text('Sanitrax Report Submitted!')));
-        Navigator.pop(context);
+        if (_selectedIssueType == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please select an issue type!')),
+          );
+          return;
+        }
+        if (_isSubmitting) return;
+
+        setState(() {
+          _isSubmitting = true;
+        });
+
+        try {
+          final user = FirebaseAuth.instance.currentUser;
+          if (user == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('You must be logged in to submit an issue.'),
+              ),
+            );
+            return;
+          }
+
+          // 1. Upload image to storage
+          final imageUrl = await cloudinary_service.uploadImage(
+            _capturedImage!,
+          );
+
+          // 2. Create IssueModel
+          final issue = IssueModel(
+            reportedBy: user.uid,
+            issueType: _selectedIssueType!,
+            description: _notesController.text,
+            submittedAt: Timestamp.now(),
+            imageUrl: imageUrl,
+          );
+
+          // 3. Add issue to Firestore
+          await _firestoreService.addIssue(issue);
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Sanitrax Report Submitted!')),
+          );
+          Navigator.pop(context);
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to submit report: $e')),
+          );
+        } finally {
+          setState(() {
+            _isSubmitting = false;
+          });
+        }
       },
       child: Container(
         width: double.infinity,
@@ -249,11 +397,18 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
           borderRadius: BorderRadius.circular(30),
         ),
         alignment: Alignment.center,
-        child: const Text('Submit Report',
-            style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 16)),
+        child: _isSubmitting
+            ? const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              )
+            : const Text(
+                'Submit Report',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
       ),
     );
   }
@@ -262,12 +417,15 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
-                color: Colors.grey,
-                letterSpacing: 0.5)),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w900,
+            color: Colors.grey,
+            letterSpacing: 0.5,
+          ),
+        ),
         const SizedBox(height: 10),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
@@ -280,11 +438,14 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
               Icon(icon, color: const Color(0xFF4A5D4A), size: 18),
               const SizedBox(width: 10),
               Expanded(
-                child: Text(value,
-                    style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF4A5D4A),
-                        fontWeight: FontWeight.bold)),
+                child: Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF4A5D4A),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ],
           ),
@@ -312,8 +473,10 @@ class _PressableScaleState extends State<_PressableScale>
   @override
   void initState() {
     super.initState();
-    _controller =
-        AnimationController(duration: const Duration(milliseconds: 100), vsync: this);
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 100),
+      vsync: this,
+    );
     _scaleAnimation = Tween<double>(begin: 1.0, end: 0.96).animate(_controller);
   }
 

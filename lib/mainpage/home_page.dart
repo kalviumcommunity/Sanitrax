@@ -110,7 +110,14 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               GestureDetector(
-                onTap: () => _navigateTo('Profile'),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ProfilePage(),
+                    ),
+                  );
+                },
                 child: const CircleAvatar(
                   radius: 20,
                   backgroundColor: Color(0xFFE6CCB2),
