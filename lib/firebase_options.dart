@@ -46,6 +46,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '549626935360',
     projectId: 'sanitrax-8a4ee',
     authDomain: 'sanitrax-8a4ee.firebaseapp.com',
+    databaseURL: 'https://sanitrax-8a4ee-default-rtdb.firebaseio.com',
     storageBucket: 'sanitrax-8a4ee.firebasestorage.app',
   );
 
@@ -54,6 +55,7 @@ class DefaultFirebaseOptions {
     appId: '1:549626935360:android:6fab6d540d49bbf7acc7a5',
     messagingSenderId: '549626935360',
     projectId: 'sanitrax-8a4ee',
+    databaseURL: 'https://sanitrax-8a4ee-default-rtdb.firebaseio.com',
     storageBucket: 'sanitrax-8a4ee.firebasestorage.app',
   );
 
@@ -62,6 +64,7 @@ class DefaultFirebaseOptions {
     appId: '1:549626935360:ios:9f583097f5dacf12acc7a5',
     messagingSenderId: '549626935360',
     projectId: 'sanitrax-8a4ee',
+    databaseURL: 'https://sanitrax-8a4ee-default-rtdb.firebaseio.com',
     storageBucket: 'sanitrax-8a4ee.firebasestorage.app',
     iosBundleId: 'com.example.flutterApplication1',
   );
@@ -71,6 +74,7 @@ class DefaultFirebaseOptions {
     appId: '1:549626935360:ios:9f583097f5dacf12acc7a5',
     messagingSenderId: '549626935360',
     projectId: 'sanitrax-8a4ee',
+    databaseURL: 'https://sanitrax-8a4ee-default-rtdb.firebaseio.com',
     storageBucket: 'sanitrax-8a4ee.firebasestorage.app',
     iosBundleId: 'com.example.flutterApplication1',
   );
@@ -81,6 +85,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '549626935360',
     projectId: 'sanitrax-8a4ee',
     authDomain: 'sanitrax-8a4ee.firebaseapp.com',
+    databaseURL: 'https://sanitrax-8a4ee-default-rtdb.firebaseio.com',
     storageBucket: 'sanitrax-8a4ee.firebasestorage.app',
   );
 }
