@@ -1,14 +1,13 @@
-import 'dart:math' as math;
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart' as ll;
 import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart' as ll;
 
 class SanitraxLiveRouteMap extends StatefulWidget {
   final List<ll.LatLng>? routePoints;
-  final bool snapWithOsrm;
-  const SanitraxLiveRouteMap({super.key, this.routePoints, this.snapWithOsrm = false});
+  const SanitraxLiveRouteMap({super.key, this.routePoints});
 
   @override
   State<SanitraxLiveRouteMap> createState() => _SanitraxLiveRouteMapState();
@@ -46,53 +45,31 @@ class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap> with Single
   }
 
   Future<void> _initRoute() async {
-    try {
-      final stops = widget.routePoints ?? _defaultStops;
-      _stops = stops;
-      final decoded = await fetchOsrmRoute(stops);
-      _routePoints = decoded;
-      if (_routePoints.length < 10) {
-        // keep going but warn
-        // print
-        // ignore: avoid_print
-        print('Warning: OSRM returned a short geometry: ${_routePoints.length} points');
-      }
-      // ignore: avoid_print
-      print('OSRM route loaded with ${_routePoints.length} points');
-      _pathPoints = _resamplePath(_routePoints, 10.0);
-      _truck = _pathPoints.first;
-      _computeSegmentMetrics();
-      _controller = AnimationController(vsync: this, duration: _segmentDuration(0));
-      _t = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(parent: _controller, curve: Curves.linear))
-        ..addListener(_onTick)
-        ..addStatusListener(_onStatus);
-      setState(() {
-        _ready = true;
-      });
-      _controller.forward();
-    } catch (e) {
-      // ignore: avoid_print
-      print('OSRM route load failed: $e');
-      rethrow;
-    }
+    final stops = widget.routePoints ?? _defaultStops;
+    _stops = stops;
+    final decoded = await fetchOsrmRoute(stops);
+    _routePoints = decoded;
+    _pathPoints = _resamplePath(_routePoints, 10.0);
+    _truck = _pathPoints.first;
+    _computeSegmentMetrics();
+    _controller = AnimationController(vsync: this, duration: _segmentDuration(0));
+    _t = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(parent: _controller, curve: Curves.linear))
+      ..addListener(_onTick)
+      ..addStatusListener(_onStatus);
+    setState(() {
+      _ready = true;
+    });
+    _controller.forward();
   }
 
   Future<List<ll.LatLng>> fetchOsrmRoute(List<ll.LatLng> stops) async {
-    if (stops.length < 2) {
-      throw Exception('At least two stops required');
-    }
     final coords = stops.map((p) => '${p.longitude},${p.latitude}').join(';');
-    final url =
-        'https://router.project-osrm.org/route/v1/driving/$coords?overview=full&geometries=geojson';
-    final uri = Uri.parse(url);
+    final uri = Uri.parse('https://router.project-osrm.org/route/v1/driving/$coords?overview=full&geometries=geojson');
     final resp = await http.get(uri);
     if (resp.statusCode != 200) {
       throw Exception('OSRM HTTP ${resp.statusCode}');
     }
     final data = jsonDecode(resp.body) as Map<String, dynamic>;
-    if (data['routes'] == null || (data['routes'] as List).isEmpty) {
-      throw Exception('OSRM: no routes returned');
-    }
     final route0 = (data['routes'] as List).first as Map<String, dynamic>;
     final geometry = route0['geometry'] as Map<String, dynamic>;
     final coordsList = geometry['coordinates'] as List<dynamic>;
@@ -108,7 +85,9 @@ class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap> with Single
 
   @override
   void dispose() {
-    _controller.dispose();
+    if (_ready) {
+      _controller.dispose();
+    }
     super.dispose();
   }
 
@@ -152,7 +131,7 @@ class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap> with Single
 
   ll.LatLng _interpolate(ll.LatLng a, ll.LatLng b, double t) {
     return ll.LatLng(a.latitude + (b.latitude - a.latitude) * t, a.longitude + (b.longitude - a.longitude) * t);
-    }
+  }
 
   List<ll.LatLng> _resamplePath(List<ll.LatLng> pts, double stepMeters) {
     if (pts.length < 2) return pts;
@@ -195,13 +174,18 @@ class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap> with Single
       children: [
         FlutterMap(
           mapController: _mapController,
-          options: MapOptions(initialCenter: _pathPoints.first, initialZoom: _zoom, interactionOptions: const InteractionOptions(flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag)),
+          options: MapOptions(
+            initialCenter: _pathPoints.first,
+            initialZoom: _zoom,
+            interactionOptions: const InteractionOptions(flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag),
+          ),
           children: [
             TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'com.example.sanitrax'),
             PolylineLayer(polylines: [
               Polyline(points: _pathPoints, color: const Color(0xFFFFFFFF), strokeWidth: 5, borderStrokeWidth: 0),
             ]),
             MarkerLayer(markers: [
+              for (int i = 0; i < _stops.length; i++) _stopMarker(i),
               _truckMarker(),
             ]),
           ],
@@ -255,7 +239,7 @@ class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap> with Single
   }
 
   Widget _etaCard() {
-    final progress = (_segment + _t.value) / (_routePoints.length - 1);
+    final progress = (_segment + _t.value) / (_pathPoints.length - 1);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       decoration: BoxDecoration(color: const Color(0xFF5E6F52), borderRadius: BorderRadius.circular(30), boxShadow: [BoxShadow(color: const Color(0xFF5E6F52).withOpacity(0.35), blurRadius: 16, offset: const Offset(0, 10))]),
@@ -271,7 +255,7 @@ class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap> with Single
                 children: const [
                   Text('ESTIMATED ARRIVAL', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
                   SizedBox(height: 6),
-                  Text('10:30 AM - 10:40 AM', style: TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.w900)),
+                  Text('12 min', style: TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.w900)),
                   SizedBox(height: 2),
                   Text('On Time', style: TextStyle(color: Colors.white70, fontSize: 16)),
                 ],
@@ -301,3 +285,4 @@ class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap> with Single
     );
   }
 }
+

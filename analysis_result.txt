@@ -1,0 +1,8 @@
+Analyzing sanitrax_live_route_map.dart...
+
+  error - sanitrax_live_route_map.dart:160:35 - The argument type 'bool Function(BuildContext)' can't be assigned to the parameter type 'bool?'.  - argument_type_not_assignable
+   info - sanitrax_live_route_map.dart:171:58 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - sanitrax_live_route_map.dart:213:57 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - sanitrax_live_route_map.dart:268:58 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+
+4 issues found.
