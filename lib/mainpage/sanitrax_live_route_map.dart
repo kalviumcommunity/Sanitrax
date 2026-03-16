@@ -1,20 +1,26 @@
-import 'dart:math' as math;
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as ll;
 import 'package:http/http.dart' as http;
 
+import '../services/map_config.dart';
+
 class SanitraxLiveRouteMap extends StatefulWidget {
   final List<ll.LatLng>? routePoints;
   final bool snapWithOsrm;
-  const SanitraxLiveRouteMap({super.key, this.routePoints, this.snapWithOsrm = false});
+  const SanitraxLiveRouteMap({
+    super.key,
+    this.routePoints,
+    this.snapWithOsrm = false,
+  });
 
   @override
   State<SanitraxLiveRouteMap> createState() => _SanitraxLiveRouteMapState();
 }
 
-class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap> with SingleTickerProviderStateMixin {
+class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap>
+    with SingleTickerProviderStateMixin {
   final MapController _mapController = MapController();
   final List<ll.LatLng> _defaultStops = const [
     ll.LatLng(11.1271, 78.6569),
@@ -22,22 +28,19 @@ class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap> with Single
     ll.LatLng(11.1300, 78.6625),
     ll.LatLng(11.1325, 78.6660),
   ];
-  late List<ll.LatLng> _stops;
   late List<ll.LatLng> _routePoints;
   late List<ll.LatLng> _pathPoints;
 
-  late final AnimationController _controller;
-  late final Animation<double> _t;
-  int _segment = 0;
+  AnimationController? _controller;
   late ll.LatLng _truck;
-  double _bearingRad = 0;
   double _zoom = 15.5;
   final ll.Distance _distance = const ll.Distance();
-  late final List<double> _segmentLengths;
-  late final double _totalLength;
-  static const Duration _baseLoop = Duration(seconds: 12);
-  static const double _resampleStepMeters = 15.0;
+  double _progress = 0;
+  double _totalDistanceMeters = 1;
+  bool _arrived = false;
+  static const double _assumedSpeedKmph = 24;
   bool _ready = false;
+  bool _mapIsReady = false;
 
   @override
   void initState() {
@@ -48,28 +51,35 @@ class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap> with Single
   Future<void> _initRoute() async {
     try {
       final stops = widget.routePoints ?? _defaultStops;
-      _stops = stops;
       final decoded = await fetchOsrmRoute(stops);
       _routePoints = decoded;
       if (_routePoints.length < 10) {
         // keep going but warn
         // print
         // ignore: avoid_print
-        print('Warning: OSRM returned a short geometry: ${_routePoints.length} points');
+        print(
+          'Warning: OSRM returned a short geometry: ${_routePoints.length} points',
+        );
       }
       // ignore: avoid_print
       print('OSRM route loaded with ${_routePoints.length} points');
       _pathPoints = _resamplePath(_routePoints, 10.0);
+      if (_pathPoints.length < 2) {
+        throw Exception('Route path is too short for animation');
+      }
       _truck = _pathPoints.first;
-      _computeSegmentMetrics();
-      _controller = AnimationController(vsync: this, duration: _segmentDuration(0));
-      _t = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(parent: _controller, curve: Curves.linear))
-        ..addListener(_onTick)
-        ..addStatusListener(_onStatus);
+      _totalDistanceMeters = _calculatePathDistance(_pathPoints);
+      _controller =
+          AnimationController(
+              vsync: this,
+              duration: _durationForDistance(_totalDistanceMeters),
+            )
+            ..addListener(_onTick)
+            ..addStatusListener(_onStatus)
+            ..forward();
       setState(() {
         _ready = true;
       });
-      _controller.forward();
     } catch (e) {
       // ignore: avoid_print
       print('OSRM route load failed: $e');
@@ -83,7 +93,7 @@ class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap> with Single
     }
     final coords = stops.map((p) => '${p.longitude},${p.latitude}').join(';');
     final url =
-        'https://router.project-osrm.org/route/v1/driving/$coords?overview=full&geometries=geojson';
+        '${MapConfig.osrmRouteBaseUrl}/$coords?overview=full&geometries=geojson';
     final uri = Uri.parse(url);
     final resp = await http.get(uri);
     if (resp.statusCode != 200) {
@@ -108,51 +118,58 @@ class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap> with Single
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller?.dispose();
     super.dispose();
   }
 
-  void _onStatus(AnimationStatus s) {
-    if (s == AnimationStatus.completed) {
-      _segment = (_segment + 1) % (_pathPoints.length - 1);
-      _controller.duration = _segmentDuration(_segment);
-      _controller.forward(from: 0);
+  void _onStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed) {
+      _progress = 1;
+      _truck = _pathPoints.last;
+      _arrived = true;
+      if (mounted) {
+        setState(() {});
+      }
     }
   }
 
   void _onTick() {
-    final a = _pathPoints[_segment];
-    final b = _pathPoints[_segment + 1];
-    final p = _interpolate(a, b, _t.value);
-    final prevT = (_t.value - 0.02).clamp(0.0, 1.0);
-    final prev = _interpolate(a, b, prevT);
-    final bearing = _bearing(prev, p);
-    _truck = p;
-    _bearingRad = bearing;
-    _mapController.move(_truck, _zoom);
+    final controller = _controller;
+    if (controller == null || _arrived) return;
+    final totalSegments = _pathPoints.length - 1;
+    final raw = controller.value * totalSegments;
+    final segment = raw.floor().clamp(0, totalSegments - 1);
+    final localT = raw - segment;
+    final a = _pathPoints[segment];
+    final b = _pathPoints[segment + 1];
+    _truck = _interpolate(a, b, localT);
+    _progress = controller.value.clamp(0.0, 1.0);
+    if (_mapIsReady) {
+      _mapController.move(_truck, _zoom);
+    }
     if (mounted) setState(() {});
   }
 
-  void _computeSegmentMetrics() {
-    _segmentLengths = <double>[];
-    double sum = 0;
-    for (var i = 0; i < _pathPoints.length - 1; i++) {
-      final d = _distance(_pathPoints[i], _pathPoints[i + 1]);
-      _segmentLengths.add(d);
-      sum += d;
-    }
-    _totalLength = sum == 0 ? 1 : sum;
+  Duration _durationForDistance(double meters) {
+    final seconds = ((meters / 1000) / _assumedSpeedKmph * 3600).round();
+    return Duration(seconds: seconds.clamp(12, 180));
   }
 
-  Duration _segmentDuration(int idx) {
-    final frac = _segmentLengths[idx] / _totalLength;
-    final ms = (_baseLoop.inMilliseconds * frac).clamp(200.0, _baseLoop.inMilliseconds.toDouble());
-    return Duration(milliseconds: ms.round());
+  double _calculatePathDistance(List<ll.LatLng> points) {
+    if (points.length < 2) return 1;
+    var total = 0.0;
+    for (var i = 0; i < points.length - 1; i++) {
+      total += _distance(points[i], points[i + 1]);
+    }
+    return total <= 0 ? 1 : total;
   }
 
   ll.LatLng _interpolate(ll.LatLng a, ll.LatLng b, double t) {
-    return ll.LatLng(a.latitude + (b.latitude - a.latitude) * t, a.longitude + (b.longitude - a.longitude) * t);
-    }
+    return ll.LatLng(
+      a.latitude + (b.latitude - a.latitude) * t,
+      a.longitude + (b.longitude - a.longitude) * t,
+    );
+  }
 
   List<ll.LatLng> _resamplePath(List<ll.LatLng> pts, double stepMeters) {
     if (pts.length < 2) return pts;
@@ -173,18 +190,32 @@ class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap> with Single
     return out;
   }
 
-  double _bearing(ll.LatLng a, ll.LatLng b) {
-    final lat1 = _toRad(a.latitude);
-    final lat2 = _toRad(b.latitude);
-    final dLon = _toRad(b.longitude - a.longitude);
-    final y = math.sin(dLon) * math.cos(lat2);
-    final x = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(dLon);
-    var brng = math.atan2(y, x);
-    if (brng < 0) brng += 2 * math.pi;
-    return brng;
+  List<ll.LatLng> _traveledPoints() {
+    if (_pathPoints.length < 2) return _pathPoints;
+    final upto = (_progress * (_pathPoints.length - 1)).floor().clamp(
+      1,
+      _pathPoints.length - 1,
+    );
+    return _pathPoints.take(upto + 1).toList();
   }
 
-  double _toRad(double d) => d * math.pi / 180.0;
+  double _remainingDistanceKm() {
+    final remaining = _totalDistanceMeters * (1 - _progress);
+    return remaining <= 0 ? 0 : remaining / 1000;
+  }
+
+  int _remainingEtaMinutes() {
+    final km = _remainingDistanceKm();
+    if (km <= 0.01) return 0;
+    return ((km / _assumedSpeedKmph) * 60).ceil();
+  }
+
+  String _etaText() {
+    if (_arrived) return 'Reached';
+    final minutes = _remainingEtaMinutes();
+    if (minutes <= 1) return '1 min';
+    return '$minutes mins';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -195,23 +226,55 @@ class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap> with Single
       children: [
         FlutterMap(
           mapController: _mapController,
-          options: MapOptions(initialCenter: _pathPoints.first, initialZoom: _zoom, interactionOptions: const InteractionOptions(flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag)),
+          options: MapOptions(
+            initialCenter: _pathPoints.first,
+            initialZoom: _zoom,
+            onMapReady: () {
+              _mapIsReady = true;
+              _mapController.move(_truck, _zoom);
+            },
+            interactionOptions: const InteractionOptions(
+              flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
+            ),
+          ),
           children: [
-            TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'com.example.sanitrax'),
-            PolylineLayer(polylines: [
-              Polyline(points: _pathPoints, color: const Color(0xFFFFFFFF), strokeWidth: 5, borderStrokeWidth: 0),
-            ]),
-            MarkerLayer(markers: [
-              _truckMarker(),
-            ]),
+            TileLayer(
+              urlTemplate: MapConfig.osmTileUrl,
+              userAgentPackageName: MapConfig.userAgentPackageName,
+            ),
+            PolylineLayer(
+              polylines: [
+                Polyline(
+                  points: _pathPoints,
+                  color: const Color(0xFFBFC8BC),
+                  strokeWidth: 7,
+                ),
+                Polyline(
+                  points: _traveledPoints(),
+                  color: const Color(0xFF3E5E4B),
+                  strokeWidth: 5,
+                ),
+              ],
+            ),
+            MarkerLayer(markers: [_destinationMarker(), _truckMarker()]),
           ],
         ),
         Positioned(
-          bottom: 20,
-          left: 20,
-          right: 20,
-          child: _etaCard(),
-        )
+          top: 18,
+          left: 18,
+          child: DecoratedBox(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [BoxShadow(color: Color(0x22000000), blurRadius: 10)],
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.chevron_left, color: Color(0xFF5F6F5A)),
+              onPressed: () => Navigator.maybePop(context),
+            ),
+          ),
+        ),
+        Positioned(bottom: 20, left: 20, right: 20, child: _etaCard()),
       ],
     );
   }
@@ -219,46 +282,60 @@ class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap> with Single
   Marker _truckMarker() {
     return Marker(
       point: _truck,
-      width: 46,
-      height: 46,
-      child: Transform.rotate(
-        angle: _bearingRad,
+      width: 54,
+      height: 54,
+      child: Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0x22000000),
+              blurRadius: 14,
+              spreadRadius: 1,
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(10),
         child: Container(
-          decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
-          padding: const EdgeInsets.all(8),
-          child: Container(
-            decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF5E6F52)),
-            child: const Icon(Icons.local_shipping, size: 20, color: Colors.white),
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: Color(0xFF5E6F52),
+          ),
+          child: const Icon(
+            Icons.local_shipping_rounded,
+            size: 22,
+            color: Colors.white,
           ),
         ),
       ),
     );
   }
 
-  Marker _stopMarker(int i) {
-    final isCurrent = i == _segment + 1;
-    final isCompleted = i <= _segment;
-    final scale = isCurrent ? 1.0 + 0.08 * math.sin(DateTime.now().millisecondsSinceEpoch / 120.0) : 1.0;
-    final Color fill = isCompleted ? const Color(0xFF2F4F2E) : const Color(0xFF5E6F52);
-    final Color border = isCompleted ? const Color(0xFF2F4F2E) : const Color(0xFFE0E8DA);
+  Marker _destinationMarker() {
     return Marker(
-      point: _stops[i],
-      width: 22,
-      height: 22,
-      child: Transform.scale(
-        scale: scale,
-        child: Container(
-          decoration: BoxDecoration(shape: BoxShape.circle, color: fill, border: Border.all(color: border, width: 2)),
-        ),
-      ),
+      point: _pathPoints.last,
+      width: 42,
+      height: 42,
+      child: const Icon(Icons.location_pin, size: 40, color: Color(0xFFEF5350)),
     );
   }
 
   Widget _etaCard() {
-    final progress = (_segment + _t.value) / (_routePoints.length - 1);
+    final remainingKm = _remainingDistanceKm();
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      decoration: BoxDecoration(color: const Color(0xFF5E6F52), borderRadius: BorderRadius.circular(30), boxShadow: [BoxShadow(color: const Color(0xFF5E6F52).withOpacity(0.35), blurRadius: 16, offset: const Offset(0, 10))]),
+      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF5E6F52),
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF5E6F52).withOpacity(0.35),
+            blurRadius: 16,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -266,36 +343,124 @@ class _SanitraxLiveRouteMapState extends State<SanitraxLiveRouteMap> with Single
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text('ESTIMATED ARRIVAL', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
-                  SizedBox(height: 6),
-                  Text('10:30 AM - 10:40 AM', style: TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.w900)),
-                  SizedBox(height: 2),
-                  Text('On Time', style: TextStyle(color: Colors.white70, fontSize: 16)),
-                ],
+              const Text(
+                'ESTIMATED ARRIVAL',
+                style: TextStyle(
+                  color: Color(0xFFDCE5D5),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.7,
+                  decoration: TextDecoration.none,
+                ),
               ),
               Container(
-                height: 76,
-                width: 76,
-                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                child: const Center(child: Text('TRACK', style: TextStyle(color: Color(0xFF5E6F52), fontWeight: FontWeight.w900, letterSpacing: 1))),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF8CA188),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  _arrived ? 'Arrived' : 'On Route',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    decoration: TextDecoration.none,
+                  ),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              minHeight: 8,
-              value: progress.clamp(0.0, 1.0),
-              backgroundColor: Colors.white24,
-              valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+          const SizedBox(height: 10),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              _etaText(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 44,
+                fontWeight: FontWeight.w900,
+                decoration: TextDecoration.none,
+              ),
             ),
           ),
           const SizedBox(height: 10),
-          const Text('Route A • Stop 8 of 12', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
+          Row(
+            children: [
+              Text(
+                '${remainingKm.toStringAsFixed(1)} km left',
+                style: const TextStyle(
+                  color: Color(0xFFDCE5D5),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Avg speed 24 km/h',
+                style: TextStyle(
+                  color: Color(0xFFDCE5D5),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              const CircleAvatar(
+                radius: 14,
+                backgroundColor: Color(0xFF8DA08A),
+                child: Icon(Icons.route, size: 15, color: Colors.white),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'Route Status',
+                      style: TextStyle(
+                        color: Color(0xFFDCE5D5),
+                        fontSize: 12,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                    SizedBox(height: 1),
+                    Text(
+                      'West Village - Sector 4',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (_arrived) ...[
+            const SizedBox(height: 12),
+            const Text(
+              'Truck has reached the destination location.',
+              style: TextStyle(
+                color: Color(0xFFDCE5D5),
+                fontSize: 12,
+                decoration: TextDecoration.none,
+              ),
+            ),
+          ],
         ],
       ),
     );

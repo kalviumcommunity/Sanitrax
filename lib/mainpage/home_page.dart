@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_application_1/mainpage/schedule_page.dart';
-import 'package:flutter_application_1/mainpage/sanitrax_live_route_map.dart';
 import 'package:flutter_application_1/mainpage/report_issue_page.dart';
 import 'package:flutter_application_1/mainpage/profile_page.dart';
+import 'package:flutter_application_1/mainpage/user_live_tracking_page.dart';
 import 'package:flutter_application_1/pages/alerts_page.dart';
 
 // TODO: Replace this placeholder with your actual Mapbox access token.
@@ -56,7 +56,7 @@ class _HomePageState extends State<HomePage> {
         lower.contains('map')) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => const SanitraxLiveRouteMap()),
+        MaterialPageRoute(builder: (context) => const UserLiveTrackingPage()),
       );
     } else if (lower.contains('profile')) {
       Navigator.push(

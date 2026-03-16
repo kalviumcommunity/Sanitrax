@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 import '../mainpage/home_page.dart';
 import '../mainpage/admin_dashboard_page.dart';
+import '../mainpage/driver_dashboard_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -23,12 +24,19 @@ class _LoginPageState extends State<LoginPage> {
     final role = await _auth.getUserRole(user.uid);
 
     if (!mounted) return;
+    final normalizedRole = role.toLowerCase();
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (_) => role.toLowerCase() == 'admin'
-            ? const AdminDashboardPage()
-            : const HomePage(),
+        builder: (_) {
+          if (normalizedRole == 'admin') {
+            return const AdminDashboardPage();
+          }
+          if (normalizedRole == 'driver') {
+            return const DriverDashboardPage();
+          }
+          return const HomePage();
+        },
       ),
     );
   }
@@ -186,7 +194,7 @@ class _LoginPageState extends State<LoginPage> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
-                        onPressed: () {},
+                        onPressed: () => _showForgotPasswordDialog(context),
                         child: const Text(
                           'Forgot Password?',
                           style: TextStyle(
@@ -314,6 +322,85 @@ class _LoginPageState extends State<LoginPage> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Future<void> _showForgotPasswordDialog(BuildContext context) async {
+    final resetEmailCtrl = TextEditingController(
+      text: emailController.text.trim(),
+    );
+    await showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Reset Password'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Enter your account email and we\'ll send you a password reset link.',
+              style: TextStyle(fontSize: 13, color: Colors.black54),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: resetEmailCtrl,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                labelText: 'Email Address',
+                hintText: 'e.g. john@example.com',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4A7C59),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              final email = resetEmailCtrl.text.trim();
+              if (email.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter your email.')),
+                );
+                return;
+              }
+              try {
+                await FirebaseAuth.instance.sendPasswordResetEmail(
+                  email: email,
+                );
+                if (dialogCtx.mounted) Navigator.pop(dialogCtx);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Password reset email sent to $email. Check your inbox.',
+                      ),
+                    ),
+                  );
+                }
+              } on FirebaseAuthException catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(e.message ?? 'Failed to send reset email.'),
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Send Reset Link'),
+          ),
+        ],
       ),
     );
   }

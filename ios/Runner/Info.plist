@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Driver check-in requires taking a selfie photo for attendance verification.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Driver location is used during trip to share live truck tracking.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

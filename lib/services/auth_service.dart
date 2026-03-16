@@ -23,15 +23,21 @@ class AuthService {
   }
 
   /// Determines user role based on email domain
-  /// Emails ending with @company.com → Admin
-  /// All other emails → Resident
+  /// driver@driver.company.com or driver*@company.com -> Driver
+  /// * @company.com -> Admin
+  /// all others -> Resident
   String roleFromEmail(String email) {
     final normalized = email.trim().toLowerCase();
     if (normalized.isEmpty) {
       return 'Resident';
     }
 
-    // Check if email ends with @company.com
+    if (normalized.endsWith('@driver.company.com') ||
+        (normalized.endsWith('@company.com') &&
+            normalized.split('@').first.startsWith('driver'))) {
+      return 'Driver';
+    }
+
     if (normalized.endsWith('@company.com')) {
       return 'Admin';
     }
@@ -102,21 +108,8 @@ class AuthService {
     final email = user.email ?? '';
     final resolvedRole = email.isNotEmpty ? roleFromEmail(email) : defaultRole;
 
-    // If profile exists, update role if it doesn't match email-based role
+    // If profile exists, keep admin-assigned role to avoid overriding manual roles.
     if (existing != null) {
-      if (existing.role != resolvedRole) {
-        print(
-          'Updating role from ${existing.role} to $resolvedRole for ${user.email}',
-        );
-        await _firestoreService.addUser(
-          UserModel(
-            uid: user.uid,
-            email: email,
-            name: existing.name,
-            role: resolvedRole,
-          ),
-        );
-      }
       return;
     }
 
