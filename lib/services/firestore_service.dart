@@ -16,6 +16,13 @@ class FirestoreService {
     'Sunday',
   ];
 
+  String todayKey() {
+    final now = DateTime.now();
+    final m = now.month.toString().padLeft(2, '0');
+    final d = now.day.toString().padLeft(2, '0');
+    return '${now.year}-$m-$d';
+  }
+
   //------------- User Methods -------------//
 
   /// Add a new user to the `users` collection in Firestore.
@@ -39,6 +46,21 @@ class FirestoreService {
       return null;
     } catch (e) {
       print('Error getting user from Firestore: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<UserModel>> getUsersByRole(String role) async {
+    try {
+      final snapshot = await _db
+          .collection('users')
+          .where('role', isEqualTo: role)
+          .get();
+      return snapshot.docs
+          .map((doc) => UserModel.fromMap(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      print('Error getting users by role: $e');
       rethrow;
     }
   }
@@ -218,5 +240,183 @@ class FirestoreService {
       print('Error saving live route: $e');
       rethrow;
     }
+  }
+
+  //------------- Driver Workflow Methods -------------//
+
+  Stream<Map<String, dynamic>?> watchTodayDriverAssignment(String driverUid) {
+    final dayKey = todayKey();
+    final docId = '${dayKey}_$driverUid';
+    return _db.collection('driver_assignments').doc(docId).snapshots().map((
+      doc,
+    ) {
+      if (!doc.exists) {
+        return null;
+      }
+      final data = doc.data() ?? <String, dynamic>{};
+      return <String, dynamic>{'id': doc.id, ...data};
+    });
+  }
+
+  Future<void> createOrUpdateDriverAssignment({
+    required String driverUid,
+    required String driverName,
+    required String areaName,
+    required String assignedByUid,
+    double? targetLat,
+    double? targetLng,
+  }) async {
+    final dayKey = todayKey();
+    final docId = '${dayKey}_$driverUid';
+    await _db.collection('driver_assignments').doc(docId).set({
+      'dayKey': dayKey,
+      'driverUid': driverUid,
+      'driverName': driverName,
+      'areaName': areaName,
+      'assignedByUid': assignedByUid,
+      'status': 'assigned',
+      if (targetLat != null) 'targetLat': targetLat,
+      if (targetLng != null) 'targetLng': targetLng,
+      'updatedAt': FieldValue.serverTimestamp(),
+      'createdAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Future<void> submitDriverCheckIn({
+    required String driverUid,
+    required String driverName,
+    required String areaName,
+    required String selfieUrl,
+    required double latitude,
+    required double longitude,
+  }) async {
+    final dayKey = todayKey();
+    final checkinId = '${dayKey}_$driverUid';
+
+    await _db.collection('driver_checkins').doc(checkinId).set({
+      'dayKey': dayKey,
+      'driverUid': driverUid,
+      'driverName': driverName,
+      'areaName': areaName,
+      'selfieUrl': selfieUrl,
+      'latitude': latitude,
+      'longitude': longitude,
+      'checkinAt': FieldValue.serverTimestamp(),
+      'status': 'checked_in',
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    final assignmentId = '${dayKey}_$driverUid';
+    await _db.collection('driver_assignments').doc(assignmentId).set({
+      'status': 'checked_in',
+      'lastCheckinAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Future<void> setDriverTripStatus({
+    required String driverUid,
+    required String status,
+  }) async {
+    final dayKey = todayKey();
+    final assignmentId = '${dayKey}_$driverUid';
+    await _db.collection('driver_assignments').doc(assignmentId).set({
+      'status': status,
+      'updatedAt': FieldValue.serverTimestamp(),
+      if (status == 'active_trip') 'startedAt': FieldValue.serverTimestamp(),
+      if (status == 'completed') 'completedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Future<void> updateDriverLiveLocation({
+    required String driverUid,
+    required String driverName,
+    required String areaName,
+    required double latitude,
+    required double longitude,
+    required bool onDuty,
+    double? targetLat,
+    double? targetLng,
+  }) async {
+    final dayKey = todayKey();
+    await _db.collection('driver_live_locations').doc(driverUid).set({
+      'dayKey': dayKey,
+      'driverUid': driverUid,
+      'driverName': driverName,
+      'areaName': areaName,
+      'latitude': latitude,
+      'longitude': longitude,
+      if (targetLat != null) 'targetLat': targetLat,
+      if (targetLng != null) 'targetLng': targetLng,
+      'onDuty': onDuty,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Stream<Map<String, dynamic>?> watchDriverLiveLocation(String driverUid) {
+    return _db
+        .collection('driver_live_locations')
+        .doc(driverUid)
+        .snapshots()
+        .map((doc) {
+          if (!doc.exists) {
+            return null;
+          }
+          final data = doc.data() ?? <String, dynamic>{};
+          return <String, dynamic>{'id': doc.id, ...data};
+        });
+  }
+
+  Stream<List<Map<String, dynamic>>> streamActiveDriversToday({
+    String? areaName,
+  }) {
+    final dayKey = todayKey();
+    return _db.collection('driver_live_locations').snapshots().map((snapshot) {
+      var drivers = snapshot.docs
+          .map((doc) => <String, dynamic>{'id': doc.id, ...doc.data()})
+          .where((item) {
+            final onDuty = item['onDuty'] == true;
+            final isToday = item['dayKey'] == dayKey;
+            return onDuty && isToday;
+          })
+          .toList();
+
+      if (areaName != null && areaName.trim().isNotEmpty) {
+        drivers = drivers
+            .where(
+              (item) =>
+                  (item['areaName']?.toString().toLowerCase() ?? '') ==
+                  areaName.toLowerCase(),
+            )
+            .toList();
+      }
+
+      return drivers;
+    });
+  }
+
+  Stream<List<Map<String, dynamic>>> streamTodayDriverCheckins() {
+    final dayKey = todayKey();
+    return _db
+        .collection('driver_checkins')
+        .where('dayKey', isEqualTo: dayKey)
+        .snapshots()
+        .map((snapshot) {
+          final items = snapshot.docs
+              .map((doc) => <String, dynamic>{'id': doc.id, ...doc.data()})
+              .toList();
+          items.sort((a, b) {
+            final at = a['checkinAt'];
+            final bt = b['checkinAt'];
+            final ad = at is Timestamp
+                ? at.toDate()
+                : DateTime.fromMillisecondsSinceEpoch(0);
+            final bd = bt is Timestamp
+                ? bt.toDate()
+                : DateTime.fromMillisecondsSinceEpoch(0);
+            return bd.compareTo(ad);
+          });
+          return items;
+        });
   }
 }

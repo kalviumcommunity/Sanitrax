@@ -57,3 +57,7 @@ ios/Runner/GoogleService-Info.plist
 # Mac / Windows junk files
 .DS_Store
 Thumbs.db
+analysis_result.txt
+pub_get_output.txt
+map_diff*.txt
+old_map_diff*.txt
